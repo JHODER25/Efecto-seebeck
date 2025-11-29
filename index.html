@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TEG Analysis Hub - Generador Termoeléctrico</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script>
+    <script src="https://cdn.jsdelivr.net/npm/date-fns"></script>
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+    
+    <style>
+        /* Estilos CSS del código original (estético) */
+        input[type=range] {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 100%;
+            height: 8px;
+            background: #4a5568;
+            border-radius: 5px;
+            outline: none;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            background: #fcd34d;
+            border-radius: 50%;
+            cursor: pointer;
+            border: 2px solid #1e293b;
+        }
+        input[type=range]::-moz-range-thumb {
+            width: 20px;
+            height: 20px;
+            background: #fcd34d;
+            border-radius: 50%;
+            cursor: pointer;
+            border: 2px solid #1e293b;
+        }
+        .tooltip-container {
+            position: relative;
+            display: inline-block;
+        }
+        .tooltip-icon {
+            cursor: help;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 22px;
+            height: 22px;
+            background: #818cf8;
+            border-radius: 50%;
+            font-size: 13px;
+            color: white;
+            font-weight: bold;
+            margin-left: 6px;
+            flex-shrink: 0;
+        }
+        .tooltip-text {
+            visibility: hidden;
+            width: 280px;
+            background-color: #1e293b;
+            color: #fcd34d;
+            text-align: left;
+            border-radius: 8px;
+            padding: 10px 12px;
+            position: absolute;
+            z-index: 1000;
+            bottom: calc(100% + 10px);
+            left: 50%;
+            transform: translateX(-50%);
+            opacity: 0;
+            transition: opacity 0.3s ease, visibility 0.3s ease;
+            font-size: 12px;
+            border: 2px solid #818cf8;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+            line-height: 1.4;
+            white-space: normal;
+        }
+        .tooltip-text::after {
+            content: "";
+            position: absolute;
+            top: 100%;
+            left: 50%;
+            margin-left: -5px;
+            border-width: 5px;
+            border-style: solid;
+            border-color: #818cf8 transparent transparent transparent;
+        }
+        .tooltip-container:hover .tooltip-text {
+            visibility: visible;
+            opacity: 1;
+        }
+    </style>
+</head>
+<body class="min-h-screen bg-gradient-to-br from-slate-950 via-purple-950 to-slate-950 text-white p-4 md:p-8">
+    
+    <div class="max-w-7xl mx-auto">
+        
+        <div class="text-center mb-12">
+            <h1 class="text-5xl font-black mb-2 bg-gradient-to-r from-yellow-400 to-purple-400 bg-clip-text text-transparent">⚡ Generador Termoeléctrico TEG</h1>
+            <p class="text-purple-300 text-lg">Calcula cuánta energía puedes generar con calor residual</p>
+        </div>
+
+        <div class="flex gap-4 mb-8 border-b border-purple-500/50 overflow-x-auto">
+            <button id="btn-teorica" class="pb-4 px-6 font-bold border-b-2 border-yellow-400 text-yellow-400 whitespace-nowrap">
+                <i data-lucide="settings" class="w-5 h-5 inline mr-2"></i>Configuración
+            </button>
+            <button id="btn-real" class="pb-4 px-6 font-bold text-purple-300 whitespace-nowrap">
+                <i data-lucide="database" class="w-5 h-5 inline mr-2"></i>Análisis Puno
+            </button>
+        </div>
+
+        <div id="tab-teorica" class="space-y-8">
+            
+            <div class="bg-gradient-to-r from-blue-900/30 to-purple-900/30 rounded-xl p-6 border border-blue-500/50">
+                <h2 class="text-2xl font-bold mb-4 text-blue-400 flex items-center gap-2">
+                    <i data-lucide="box" class="w-6 h-6"></i>
+                    Características del Módulo TEG
+                </h2>
+                <p class="text-purple-200 mb-6">Estos parámetros describen las propiedades físicas de tu generador termoeléctrico</p>
+                
+                <div class="bg-slate-800 rounded-lg p-5 border border-cyan-500/50 mb-6">
+                    <div class="flex items-center gap-2 mb-3">
+                        <label class="block font-bold text-yellow-400">📦 Seleccionar Módulo</label>
+                        <div class="tooltip-container">
+                            <div class="tooltip-icon">?</div>
+                            <span class="tooltip-text">Elige un módulo predefinido o "Personalizado" para ingresar tus propios parámetros del datasheet</span>
+                        </div>
+                    </div>
+                    <select id="in-modulo" class="w-full bg-slate-700 border border-cyan-400 rounded p-3 text-white font-bold mb-4">
+                        <option value="sp1848">SP1848 40×40mm (1.4Ω, 8.5W/K)</option>
+                        <option value="generico">Genérico (1.0cm², 2.5Ω)</option>
+                        <option value="personalizado">Personalizado - Ingresar valores</option>
+                    </select>
+                </div>
+                
+                <div class="grid md:grid-cols-2 gap-6">
+                    <div class="bg-slate-800 rounded-lg p-5 border border-purple-500/50">
+                        <div class="flex items-center gap-2 mb-3">
+                            <label class="block font-bold text-yellow-400">📏 Área del Módulo</label>
+                            <div class="tooltip-container">
+                                <div class="tooltip-icon">?</div>
+                                <span class="tooltip-text">Superficie de contacto donde se genera la energía. Más área = más potencia (típico: 1-4 cm²)</span>
+                            </div>
+                        </div>
+                        <p class="text-sm text-purple-300 mb-2">Valor actual: <span id="val-area" class="text-yellow-400 font-bold">1.0 cm²</span></p>
+                        <input type="range" id="in-area" min="0.5" max="20" step="0.1" value="1.0" class="w-full" disabled>
+                    </div>
+
+                    <div class="bg-slate-800 rounded-lg p-5 border border-purple-500/50">
+                        <div class="flex items-center gap-2 mb-3">
+                            <label class="block font-bold text-yellow-400">📐 Espesor</label>
+                            <div class="tooltip-container">
+                                <div class="tooltip-icon">?</div>
+                                <span class="tooltip-text">Grosor del material. Afecta la resistencia interna (típico: 3-5 mm)</span>
+                            </div>
+                        </div>
+                        <p class="text-sm text-purple-300 mb-2">Valor actual: <span id="val-espesor" class="text-yellow-400 font-bold">4.0 mm</span></p>
+                        <input type="range" id="in-espesor" min="1" max="10" step="0.5" value="4.0" class="w-full" disabled>
+                    </div>
+
+                    <div class="bg-slate-800 rounded-lg p-5 border border-purple-500/50">
+                        <div class="flex items-center gap-2 mb-3">
+                            <label class="block font-bold text-yellow-400">🛡️ Aislamiento</label>
+                            <div class="tooltip-container">
+                                <div class="tooltip-icon">?</div>
+                                <span class="tooltip-text">Calidad del aislamiento. Menor valor = mejor aislamiento = menos pérdidas. Rango 0.1-2.0</span>
+                            </div>
+                        </div>
+                        <p class="text-sm text-purple-300 mb-2">Valor actual: <span id="val-r-th" class="text-yellow-400 font-bold">0.50 K/W</span></p>
+                        <input type="range" id="in-r-th" min="0.1" max="2.0" step="0.1" value="0.5" class="w-full">
+                    </div>
+
+                    <div class="bg-slate-800 rounded-lg p-5 border border-purple-500/50">
+                        <div class="flex items-center gap-2 mb-3">
+                            <label class="block font-bold text-yellow-400">🌡️ Emitancia</label>
+                            <div class="tooltip-container">
+                                <div class="tooltip-icon">?</div>
+                                <span class="tooltip-text">Capacidad de emitir calor. Menor = menos pérdidas por radiación (típico: 0.7-0.9)</span>
+                            </div>
+                        </div>
+                        <p class="text-sm text-purple-300 mb-2">Valor actual: <span id="val-emitancia" class="text-yellow-400 font-bold">0.80</span></p>
+                        <input type="range" id="in-emitancia" min="0.3" max="1.0" step="0.05" value="0.8" class="w-full">
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-gradient-to-r from-red-900/30 to-orange-900/30 rounded-xl p-6 border border-red-500/50">
+                <h2 class="text-2xl font-bold mb-4 text-red-400 flex items-center gap-2">
+                    <i data-lucide="flame" class="w-6 h-6"></i>
+                    Condiciones de Operación
+                </h2>
+                <p class="text-purple-200 mb-6">Define cómo va a funcionar tu generador</p>
+                
+                <div class="grid md:grid-cols-2 gap-6">
+                    <div class="bg-slate-800 rounded-lg p-5 border border-red-500/50">
+                        <div class="flex items-center gap-2 mb-3">
+                            <label class="block font-bold text-yellow-400">🔥 Temperatura Caliente (T_h)</label>
+                            <div class="tooltip-container">
+                                <div class="tooltip-icon">?</div>
+                                <span class="tooltip-text">Temperatura de tu fuente de calor. Ej: fogón (150°C), radiador industrial (200°C)</span>
+                            </div>
+                        </div>
+                        <p class="text-sm text-purple-300 mb-2">Valor actual: <span id="val-th" class="text-yellow-400 font-bold">150 °C</span></p>
+                        <input type="range" id="in-th" min="30" max="300" step="5" value="150" class="w-full">
+                    </div>
+
+                    <div class="bg-slate-800 rounded-lg p-5 border border-blue-500/50">
+                        <div class="flex items-center gap-2 mb-3">
+                            <label class="block font-bold text-yellow-400">❄️ Temperatura Fría (T_c)</label>
+                            <div class="tooltip-container">
+                                <div class="tooltip-icon">?</div>
+                                <span class="tooltip-text">Temperatura del lado frío. Típicamente la temperatura ambiente (Puno: ~10°C)</span>
+                            </div>
+                        </div>
+                        <p class="text-sm text-purple-300 mb-2">Valor actual: <span id="val-tc" class="text-yellow-400 font-bold">10 °C</span></p>
+                        <input type="range" id="in-tc" min="-10" max="40" step="1" value="10" class="w-full">
+                    </div>
+
+                    <div class="bg-slate-800 rounded-lg p-5 border border-green-500/50">
+                        <div class="flex items-center gap-2 mb-3">
+                            <label class="block font-bold text-yellow-400">⚡ Resistencia de Carga</label>
+                            <div class="tooltip-container">
+                                <div class="tooltip-icon">?</div>
+                                <span class="tooltip-text">Resistencia de tu dispositivo. Busca la máxima potencia cuando coincide con la resistencia interna</span>
+                            </div>
+                        </div>
+                        <p class="text-sm text-purple-300 mb-2">Valor actual: <span id="val-rl" class="text-yellow-400 font-bold">2.5 Ω</span></p>
+                        <input type="range" id="in-rl" min="0.1" max="20" step="0.2" value="2.5" class="w-full">
+                    </div>
+
+                    <div class="bg-slate-800 rounded-lg p-5 border border-cyan-500/50">
+                        <div class="flex items-center gap-2 mb-3">
+                            <label class="block font-bold text-yellow-400">⏱️ Horas de Carga/Día</label>
+                            <div class="tooltip-container">
+                                <div class="tooltip-icon">?</div>
+                                <span class="tooltip-text">Cuántas horas al día tienes disponible tu fuente de calor (Ej: fogón 5-6 horas)</span>
+                            </div>
+                        </div>
+                        <p class="text-sm text-purple-300 mb-2">Valor actual: <span id="val-horas" class="text-yellow-400 font-bold">5 h</span></p>
+                        <input type="range" id="in-horas" min="1" max="24" step="1" value="5" class="w-full">
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-gradient-to-r from-green-900/30 to-emerald-900/30 rounded-xl p-6 border border-green-500/50">
+                <h2 class="text-2xl font-bold mb-6 text-green-400 flex items-center gap-2">
+                    <i data-lucide="bar-chart-2" class="w-6 h-6"></i>
+                    Resultados de Energía Generada
+                </h2>
+
+                <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <div class="bg-gradient-to-br from-green-700 to-green-900 rounded-lg p-5 border border-green-400/50">
+                        <p class="text-green-200 text-sm mb-2">⚡ Energía por Día</p>
+                        <p class="text-3xl font-bold text-yellow-400" id="res-energia">0.00</p>
+                        <p class="text-green-300 text-xs">Wh/día</p>
+                        <div class="tooltip-icon" style="margin-top: 8px;">?
+                            <span class="tooltip-text" style="bottom: 30px;">Energía total que generas en un día completo</span>
+                        </div>
+                    </div>
+
+                    <div class="bg-gradient-to-br from-orange-700 to-orange-900 rounded-lg p-5 border border-orange-400/50">
+                        <p class="text-orange-200 text-sm mb-2">🌡️ Diferencia de Temp (ΔT)</p>
+                        <p class="text-3xl font-bold text-yellow-400" id="res-deltaT">0.0</p>
+                        <p class="text-orange-300 text-xs">°C</p>
+                    </div>
+
+                    <div class="bg-gradient-to-br from-blue-700 to-blue-900 rounded-lg p-5 border border-blue-400/50">
+                        <p class="text-blue-200 text-sm mb-2">🔌 Voltaje de Salida</p>
+                        <p class="text-3xl font-bold text-yellow-400" id="res-v-oc">0.00</p>
+                        <p class="text-blue-300 text-xs">Voltios</p>
+                    </div>
+
+                    <div class="bg-gradient-to-br from-purple-700 to-purple-900 rounded-lg p-5 border border-purple-400/50">
+                        <p class="text-purple-200 text-sm mb-2">⚙️ Corriente</p>
+                        <p class="text-3xl font-bold text-yellow-400" id="res-corriente">0.00</p>
+                        <p class="text-purple-300 text-xs">mA (miliamperios)</p>
+                    </div>
+
+                    <div class="bg-gradient-to-br from-indigo-700 to-indigo-900 rounded-lg p-5 border border-indigo-400/50">
+                        <p class="text-indigo-200 text-sm mb-2">⚡ Potencia de Salida</p>
+                        <p class="text-3xl font-bold text-yellow-400" id="res-potencia">0.00</p>
+                        <p class="text-indigo-300 text-xs">mW (miliwatios)</p>
+                    </div>
+
+                    <div class="bg-gradient-to-br from-cyan-700 to-cyan-900 rounded-lg p-5 border border-cyan-400/50">
+                        <p class="text-cyan-200 text-sm mb-2">📊 Eficiencia Carnot (Teórica)</p>
+                        <p class="text-3xl font-bold text-yellow-400" id="res-eficiencia-carnot">0.0</p>
+                        <p class="text-cyan-300 text-xs">% (límite máximo)</p>
+                    </div>
+
+                    <div class="bg-gradient-to-br from-indigo-700 to-indigo-900 rounded-lg p-5 border border-indigo-400/50">
+                        <p class="text-indigo-200 text-sm mb-2">⚡ Eficiencia TEG (Real)</p>
+                        <p class="text-3xl font-bold text-yellow-400" id="res-eficiencia-teg">0.0</p>
+                        <p class="text-indigo-300 text-xs">% (5-7% típico)</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="grid lg:grid-cols-2 gap-6">
+                
+                <div class="bg-slate-800 rounded-xl p-6 border border-purple-500/50">
+                    <h3 class="text-xl font-bold mb-4 text-cyan-400">1. Parámetros Internos del TEG vs Temperatura</h3>
+                    <div class="h-72"><canvas id="chart-params-temp"></canvas></div>
+                    <div class="mt-4 p-4 bg-slate-700/50 rounded-lg border border-cyan-400/30">
+                        <h4 class="font-bold text-purple-200 mb-2">💡 Interpretación:</h4>
+                        <p id="interpretacion-params-temp" class="text-sm text-purple-300">
+                            Un **mayor α** mejora el voltaje generado ($\text{V}_{\text{oc}} = \alpha \cdot \Delta\text{T}$), pero una **mayor R** interna reduce la potencia de salida ($\text{P}_{\text{load}}$). Esta gráfica te ayuda a entender el punto de operación óptimo del material que estás utilizando.
+                        </p>
+                    </div>
+                </div>
+
+                <div class="bg-slate-800 rounded-xl p-6 border border-purple-500/50">
+                    <h3 class="text-xl font-bold mb-4 text-green-400">3. Ciclo de Temperatura Diaria (24h)</h3>
+                    <div class="h-72"><canvas id="chart-ciclo-diario"></canvas></div>
+                    <div class="mt-4 p-4 bg-slate-700/50 rounded-lg border border-green-400/30">
+                        <h4 class="font-bold text-purple-200 mb-2">💡 Interpretación:</h4>
+                         <p id="interpretacion-ciclo" class="text-sm text-purple-300">
+                            Muestra cómo la **Temperatura Caliente ($\text{T}_{\text{h}}$)** varía a lo largo de un día ideal de 24 horas, basado en la fuente de calor seleccionada. En el escenario de "Fuego (Hogar)", la $\text{T}_{\text{h}}$ está activa solo durante las horas de uso (ej. 6 am a 10 pm), alcanzando un pico máximo.
+                            <br><br>
+                            Este ciclo es clave porque la energía total generada ($\text{E}_{\text{load}}$) es la integral de la potencia generada durante las horas activas. Un ciclo más largo o con picos más altos genera más energía diaria.
+                        </p>
+                    </div>
+                </div>
+
+                <div class="lg:col-span-2 bg-slate-800 rounded-xl p-6 border border-purple-500/50 flex flex-col items-center">
+                    <h3 class="text-xl font-bold mb-4 text-orange-400">2. Distribución de Pérdidas Térmicas</h3>
+                    <div class="h-80 w-full max-w-sm"><canvas id="chart-perdidas-pie"></canvas></div>
+                    <div class="mt-4 p-4 bg-slate-700/50 rounded-lg border border-orange-400/30 w-full max-w-2xl">
+                        <h4 class="font-bold text-purple-200 mb-2">💡 Interpretación:</h4>
+                         <p id="interpretacion-perdidas" class="text-sm text-purple-300">
+                            Este gráfico de pastel representa la proporción de calor que se pierde del lado caliente ($\text{T}_{\text{h}}$) hacia el ambiente por **Radiación** y **Conducción** a través del aislamiento, sin contar la energía convertida por el TEG. 
+                            <br><br>
+                            Las **pérdidas por Radiación** dependen fuertemente de la emitancia y de la cuarta potencia de la temperatura ($\text{T}^4$). Las **pérdidas por Conducción** dependen de la calidad del aislamiento ($\text{R}_{\text{th}}$) y de $\Delta\text{T}$. El objetivo es minimizar estas pérdidas para maximizar el calor disponible para el módulo TEG.
+                        </p>
+                    </div>
+                </div>
+                
+                <div class="lg:col-span-2 bg-slate-800 rounded-xl p-6 border border-purple-500/50">
+                    <h3 class="text-xl font-bold mb-4 text-yellow-400">4. Transferencia de Potencia vs Resistencia de Carga ($\text{R}_{\text{L}}$)</h3>
+                    <div class="h-72"><canvas id="chart-transferencia"></canvas></div>
+                    <div class="mt-4 p-4 bg-slate-700/50 rounded-lg border border-yellow-400/30">
+                        <h4 class="font-bold text-purple-200 mb-2">💡 Interpretación:</h4>
+                         <p id="interpretacion-transferencia" class="text-sm text-purple-300">
+                            Esta curva demuestra el **Teorema de Máxima Transferencia de Potencia**. La potencia de salida ($\text{P}_{\text{load}}$) es máxima cuando la **Resistencia de Carga ($\text{R}_{\text{L}}$)** es igual a la **Resistencia Interna ($\text{R}$)** del módulo TEG.
+                            <br><br>
+                            El **Punto Actual** (punto amarillo) indica la potencia generada con la $\text{R}_{\text{L}}$ que has seleccionado en el *slider*. Si el punto está alejado del pico de la curva, significa que tu dispositivo no está optimizado para la resistencia interna del TEG.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="tab-real" class="space-y-8 hidden">
+            <div class="bg-gradient-to-r from-green-900/30 to-blue-900/30 rounded-xl p-6 border border-green-500/50">
+                <h2 class="text-2xl font-bold mb-2 text-green-400">📍 Análisis para Puno, Perú</h2>
+                <p class="text-purple-200 mb-3">Datos reales de los últimos 2 años (730 días) de temperatura en Puno</p>
+                <div class="bg-slate-700/50 rounded-lg p-4 border border-cyan-400/30">
+                    <p class="text-sm text-cyan-300">
+                        <strong>📦 Módulo utilizado:</strong> SP1848 40×40mm (Peltier TEG Generador)
+                    </p>
+                    <p class="text-xs text-purple-300 mt-2">
+                        Especificaciones fijas: Área 16cm² | R interno 1.4Ω | Conductancia 8.5W/K | Seebeck 0.052V/K
+                    </p>
+                    <p class="text-xs text-purple-300 mt-2">
+                        Este análisis usa predicciones realistas basadas en las características reales de este módulo y el clima de Puno.
+                    </p>
+                </div>
+            </div>
+
+            <div class="grid md:grid-cols-3 lg:grid-cols-5 gap-4">
+                <div class="bg-slate-800 rounded-lg p-4 border border-purple-500/50">
+                    <label class="block text-sm font-bold mb-2 text-yellow-400">Escenario</label>
+                    <select id="in-scenario" class="w-full bg-slate-700 border border-purple-400 rounded p-2 text-white text-sm">
+                        <option value="pesimista">🔴 Pesimista (80°C)</option>
+                        <option value="realista" selected>🟡 Realista (150°C)</option>
+                        <option value="optimista">🟢 Optimista (250°C)</option>
+                    </select>
+                </div>
+                <div class="bg-slate-800 rounded-lg p-4 border border-blue-500/50">
+                    <label class="block text-sm font-bold mb-2 text-blue-400">Tipo de Fuente</label>
+                    <select id="in-fuente" class="w-full bg-slate-700 border border-blue-400 rounded p-2 text-white text-sm">
+                        <option value="fuego" selected>🔥 Fuego (Hogar)</option>
+                        <option value="residuos">♻️ Residuos</option>
+                        <option value="industrial">🏭 Industrial</option>
+                    </select>
+                </div>
+                <div class="bg-slate-800 rounded-lg p-4 border border-green-500/50">
+                    <label class="block text-sm font-bold mb-2 text-green-400">Temperatura Fría</label>
+                    <select id="in-datatype" class="w-full bg-slate-700 border border-green-400 rounded p-2 text-white text-sm">
+                        <option value="tavg" selected>📊 Promedio Diario</option>
+                        <option value="tmin">❄️ Mínima Nocturna</option>
+                    </select>
+                </div>
+                <div class="bg-slate-800 rounded-lg p-4 border border-orange-500/50">
+                    <label class="block text-sm font-bold mb-2 text-orange-400">R Carga: <span id="val-rl-real" class="text-yellow-400">5.0 Ω</span></label>
+                    <input type="range" id="in-rl-real" min="0.5" max="20" step="0.5" value="5" class="w-full">
+                </div>
+                <div class="bg-slate-800 rounded-lg p-4 border border-cyan-500/50">
+                    <label class="block text-sm font-bold mb-2 text-cyan-400">Horas: <span id="val-horas-real" class="text-yellow-400">5 h</span></label>
+                    <input type="range" id="in-horas-real" min="1" max="24" step="1" value="5" class="w-full">
+                </div>
+            </div>
+
+            <div class="bg-slate-800 rounded-xl p-6 border border-purple-500/50">
+                <h3 class="text-xl font-bold mb-2 text-cyan-400">📉 Perfil Climático de Puno (2 años)</h3>
+                <p class="text-xs text-purple-300 mb-4">Temperatura promedio y mínima cada día</p>
+                <div class="h-80"><canvas id="chart-temp"></canvas></div>
+            </div>
+
+            <div class="bg-slate-800 rounded-xl p-6 border border-purple-500/50">
+                <h3 class="text-xl font-bold mb-2 text-yellow-400">⚡ Energía Generada Diariamente</h3>
+                <p class="text-xs text-purple-300 mb-4">Energía que generarías cada día con tu sistema</p>
+                <div class="h-80"><canvas id="chart-energy"></canvas></div>
+            </div>
+
+            <div class="bg-slate-800 rounded-xl p-6 border border-purple-500/50">
+                <h3 class="text-xl font-bold mb-2 text-green-400">📊 Energía Promedio Mensual</h3>
+                <p class="text-xs text-purple-300 mb-4">Cuánta energía generas cada mes en promedio</p>
+                <div class="h-72"><canvas id="chart-seasonality"></canvas></div>
+            </div>
+
+            <div class="bg-slate-800 rounded-xl p-6 border border-purple-500/50">
+                <h3 class="text-xl font-bold mb-2 text-blue-400">🔋 Simulación de Batería</h3>
+                <p class="text-xs text-purple-300 mb-4">Cómo se carga y descarga una batería con tu generador</p>
+                <div class="grid md:grid-cols-2 gap-4 mb-4 p-4 bg-slate-700/50 rounded-lg">
+                    <div>
+                        <label class="block text-sm font-bold mb-2 text-purple-200">Capacidad: <span id="val-batt" class="text-yellow-400">10 Wh</span></label>
+                        <input type="range" id="in-batt" min="1" max="50" step="1" value="10" class="w-full">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-bold mb-2 text-purple-200">Consumo Diario: <span id="val-cons" class="text-yellow-400">2 Wh</span></label>
+                        <input type="range" id="in-cons" min="0" max="20" step="0.5" value="2" class="w-full">
+                    </div>
+                </div>
+                <div class="h-80"><canvas id="chart-battery"></canvas></div>
+            </div>
+
+            <div class="bg-slate-800 rounded-xl p-6 border border-purple-500/50">
+                <h3 class="text-xl font-bold mb-2 text-green-400">📱 ¿Qué dispositivos puedes alimentar?</h3>
+                <p class="text-xs text-purple-300 mb-4">Analiza si tu generador puede suministrar energía a diferentes dispositivos</p>
+                <form id="form-device" class="grid md:grid-cols-3 gap-4 mb-4 p-4 bg-slate-700/50 rounded-lg border border-green-400/30">
+                    <div>
+                        <label for="in-device-name" class="block text-sm font-bold mb-2 text-purple-200">Nombre del Dispositivo</label>
+                        <input type="text" id="in-device-name" value="Radio" class="w-full bg-slate-800 border border-purple-400 rounded p-2 text-white text-sm">
+                    </div>
+                    <div>
+                        <label for="in-device-energy" class="block text-sm font-bold mb-2 text-purple-200">Energía (Wh/día)</label>
+                        <input type="number" id="in-device-energy" value="3" step="0.5" class="w-full bg-slate-800 border border-purple-400 rounded p-2 text-white text-sm">
+                    </div>
+                    <button type="submit" class="self-end bg-green-600 hover:bg-green-500 text-white font-bold py-2 px-4 rounded">
+                        Analizar
+                    </button>
+                </form>
+                <div id="device-viability-container" class="space-y-3"></div>
+            </div>
+        </div>
+
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
